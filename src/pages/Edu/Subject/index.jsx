@@ -1,187 +1,246 @@
-import React, { Component } from "react";
-import { Table, Button, Tooltip } from "antd";
-import { PlusOutlined, FormOutlined, DeleteOutlined } from "@ant-design/icons";
+import React, { Component } from "react"
+// 引入antd组件
+import { Button, Table, Tooltip, Input, message, Modal } from "antd"
+// 引入antd字体图标
+import {
+  PlusOutlined,
+  FormOutlined,
+  DeleteOutlined,
+  ExclamationCircleOutlined,
+} from "@ant-design/icons"
+import { connect } from "react-redux"
 
-import "./index.less";
+import { getSubjectList, getSubSubjectList, updateSubject } from "./redux"
+import { reqDelSubject } from "@api/edu/subject"
 
-const subjects = [
-  {
-    id: "1178214681118568449",
-    title: "后端开发",
-    children: [
-      {
-        id: "1178214681139539969",
-        title: "Java",
-        children: [],
-      },
-      {
-        id: "1178585108407984130",
-        title: "Python",
-        children: [],
-      },
-    ],
-  },
-  {
-    id: "1178214681181483010",
-    title: "前端开发",
-    children: [
-      {
-        id: "1178214681210843137",
-        title: "JavaScript",
-        children: [],
-      },
-      {
-        id: "1178585108454121473",
-        title: "HTML/CSS",
-        children: [],
-      },
-    ],
-  },
-  {
-    id: "1178214681231814658",
-    title: "云计算",
-    children: [
-      {
-        id: "1178214681252786178",
-        title: "Docker",
-        children: [],
-      },
-      {
-        id: "1178214681294729217",
-        title: "Linux",
-        children: [],
-      },
-    ],
-  },
-  {
-    id: "1178214681324089345",
-    title: "系统/运维",
-    children: [
-      {
-        id: "1178214681353449473",
-        title: "Linux",
-        children: [],
-      },
-      {
-        id: "1178214681382809602",
-        title: "Windows",
-        children: [],
-      },
-    ],
-  },
-  {
-    id: "1178214681399586817",
-    title: "数据库",
-    children: [
-      {
-        id: "1178214681428946945",
-        title: "MySQL",
-        children: [],
-      },
-      {
-        id: "1178214681454112770",
-        title: "MongoDB",
-        children: [],
-      },
-    ],
-  },
-  {
-    id: "1178214681483472898",
-    title: "大数据",
-    children: [
-      {
-        id: "1178214681504444418",
-        title: "Hadoop",
-        children: [],
-      },
-      {
-        id: "1178214681529610242",
-        title: "Spark",
-        children: [],
-      },
-    ],
-  },
-  {
-    id: "1178214681554776066",
-    title: "人工智能",
-    children: [
-      {
-        id: "1178214681584136193",
-        title: "Python",
-        children: [],
-      },
-    ],
-  },
-  {
-    id: "1178214681613496321",
-    title: "编程语言",
-    children: [
-      {
-        id: "1178214681626079234",
-        title: "Java",
-        children: [],
-      },
-    ],
-  },
-].map((item) => {
-  if (!item.children || !item.children.length) {
-    return {
-      ...item,
-      children: null,
-    };
-  }
-  return {
-    ...item,
-    children: item.children.map((item) => {
-      if (!item.children || !item.children.length) {
-        return {
-          ...item,
-          children: null,
-        };
-      }
-      return item;
-    }),
-  };
-});
+import "./index.less"
 
-export default class Subject extends Component {
-  columns = [
+@connect(
+    (state) => ({ subjectList: state.subjectList }), // 状态数据
     {
-      title: "分类名称",
-      dataIndex: "title",
-    },
-    {
-      title: "操作",
-      fixed: "right",
-      width: 200,
-      render: (data) => {
-        return (
-          <div>
-            <Tooltip title="更新课程分类">
-              <Button type="primary" style={{ margin: "0 10px" }}>
-                <FormOutlined />
-              </Button>
-            </Tooltip>
-            <Tooltip title="删除课程分类">
-              <Button type="danger">
-                <DeleteOutlined />
-              </Button>
-            </Tooltip>
-          </div>
-        );
-      },
-    },
-  ];
+        getSubjectList,
+        getSubSubjectList,
+        updateSubject,
+    }
+)
+class Subject extends Component {
+    state = {
+        expandedRowKeys: [],
+        subjectId: "", 
+        subjectTitle: "",
+        updateSubjectTitle: "", 
+        current: 1,
+        pageSize: 10, 
+    }
+
+    componentDidMount() {
+        this.getSubjectList(1, 10)
+    }
+    handleExpandedRowsChange = (expandedRowKeys) => {
+        const length = expandedRowKeys.length
+        if (length > this.state.expandedRowKeys.length) {
+            const lastKey = expandedRowKeys[length - 1]
+            this.props.getSubSubjectList(lastKey)
+        }
+        this.setState({
+          expandedRowKeys,
+        })
+    }
+    getFirstPageSubjectList = (page, limit) => {
+       this.getSubjectList(1, limit)
+    }
+
+    //显示添加页面
+    showAddSubject = () => {
+        this.props.history.push("/edu/subject/add")
+    }
+
+    //显示更新分类
+    showUpdateSubject = (subject) => {
+        return () => {
+            if (this.state.subjectId) {
+                message.warn("请更新当前课程分类~")
+                return
+            }
+            this.setState({
+                subjectId: subject._id,
+                subjectTitle: subject.title,
+            })
+        }
+    }
+
+    //收集更新分类标题数据
+    handleInputChange = (e) => {
+        this.setState({
+            updateSubjectTitle: e.target.value,
+        })
+    }
+
+    //更新课程分类
+    updateSubject = async () => {
+        const { subjectId, updateSubjectTitle, subjectTitle } = this.state
+        if (!updateSubjectTitle) {
+            message.warn("请输入要更新课程分类标题~")
+            return
+        }
+        if (updateSubjectTitle === subjectTitle) {
+            message.warn("输入更新课程分类标题不能与之前一样~")
+            return
+        }
+        await this.props.updateSubject(updateSubjectTitle, subjectId)
+        message.success("更新分类数据成功~")
+        this.cancel()
+    }
+    //取消更新课程分类
+    cancel = () => {
+        this.setState({
+            subjectId: "",
+            updateSubjectTitle: "",
+        })
+    }
+
+    delSubject = (subject) => {
+        return () => {
+            Modal.confirm({
+                title: (
+                    <p>
+                        你确认要删除 <span className="subject-text">{subject.title}</span>{" "}
+                        课程分类吗?
+                    </p>
+                ),
+                icon: <ExclamationCircleOutlined />,
+                onOk: async () => {
+                    await reqDelSubject(subject._id)
+                    message.success("删除课程分类数据成功~")
+                    const { current, pageSize } = this.state
+                    if (
+                        current > 1 &&
+                        this.props.subjectList.items.length === 1 &&
+                        subject.parentId === "0"
+                    ) {
+                        this.getSubjectList(current - 1, pageSize)
+                        return
+                    }
+                    this.getSubjectList(current, pageSize)
+                },
+            })
+        }
+    }
+
+    getSubjectList = (page, limit) => {
+        this.setState({
+            current: page,
+            pageSize: limit,
+        })
+        return this.props.getSubjectList(page, limit)
+    }
 
   render() {
-    return (
-      <div className="subject">
-        <Button type="primary" style={{ marginBottom: 20, marginLeft: 20 }}>
-          <PlusOutlined />
-          新建
-        </Button>
-        <Table rowKey="id" columns={this.columns} dataSource={subjects} />
-      </div>
-    );
+      const { subjectList } = this.props
+      const { expandedRowKeys, current, pageSize } = this.state
+      const columns = [
+          {
+              title: "分类名称",
+              key: "title",
+              render: (subject) => {
+                  const { subjectId } = this.state
+                  const id = subject._id
+
+                if (subjectId === id) {
+                    return (
+                        <Input
+                            className="subject-input"
+                            defaultValue={subject.title}
+                            onChange={this.handleInputChange}
+                        />
+                    )
+                }
+
+                return <span>{subject.title}</span>
+              },
+          },
+          {
+              title: "操作",
+              dataIndex: "",
+              key: "action",
+              width: 200,
+
+              render: (subject) => {
+                  const { subjectId } = this.state
+                  const id = subject._id
+                  if (subjectId === id) {
+                      return (
+                          <>
+                              <Button type="primary" onClick={this.updateSubject}>
+                                  确认
+                              </Button>
+                              <Button className="subject-btn" onClick={this.cancel}>
+                                取消
+                              </Button>
+                          </>
+                      )
+                  }
+
+                  return (
+                      <>
+                          <Tooltip title="更新课程分类">
+                              <Button
+                                  type="primary"
+                                  onClick={this.showUpdateSubject(subject)}
+                              >
+                                  <FormOutlined />
+                              </Button>
+                          </Tooltip>
+                          <Tooltip title="删除课程分类">
+                              <Button
+                                  type="danger"
+                                  className="subject-btn"
+                                  onClick={this.delSubject(subject)}
+                              >
+                                  <DeleteOutlined />
+                              </Button>
+                          </Tooltip>
+                      </>
+                  )
+              },
+          },
+      ]
+
+      console.log(subjectList)
+
+      return (
+          <div className="subject">
+              <Button
+                  type="primary"
+                  className="subject-btn"
+                  onClick={this.showAddSubject}
+              >
+                <PlusOutlined />
+                   新建
+                </Button>
+                <Table
+                    columns={columns} 
+                    expandable={{
+                        expandedRowKeys,
+                        onExpandedRowsChange: this.handleExpandedRowsChange,
+                    }}
+                    dataSource={subjectList.items} 
+                    rowKey="_id"
+                    pagination={{
+                      current, 
+                        pageSize, 
+                        total: subjectList.total, 
+                        showQuickJumper: true, 
+                        showSizeChanger: true, 
+                        pageSizeOptions: ["5", "10", "15", "20"],
+                        defaultPageSize: 10,
+                        onChange: this.getSubjectList,
+                        onShowSizeChange: this.getFirstPageSubjectList,
+                    }}
+                />
+        </div>
+      )
   }
 }
+
+export default Subject
